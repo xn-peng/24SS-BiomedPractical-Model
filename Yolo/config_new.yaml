@@ -1,0 +1,13 @@
+# train/val/test sets
+path: C:/Users/Xin/Desktop/YOLO/dataset
+train: train.txt
+val: val.txt
+test: test.txt
+
+# class names
+names:
+  0: Gene array
+  1: Optodroplet
+
+# nc: number of classes
+nc: 2
