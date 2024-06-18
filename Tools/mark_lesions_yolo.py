@@ -9,7 +9,7 @@ def find_white_regions(image_path):
         raise FileNotFoundError(f"Image at path {image_path} not found.")
     
     # 检测白色区域
-    _, thresholded = cv2.threshold(image, 240, 255, cv2.THRESH_BINARY)
+    _, thresholded = cv2.threshold(image, 50, 255, cv2.THRESH_BINARY)
 
     # 找到白色区域的轮廓
     contours, _ = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
