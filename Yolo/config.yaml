@@ -1,0 +1,11 @@
+# train/test sets
+Path: D:/Deutschland/Data and Computer Science/24SS/Bio Practical/Yolo/datasets/datasets/
+train: train/images
+val: val/images
+
+# class names
+names:
+  0: with_letion
+
+# nc: number of classes
+nc: 1
