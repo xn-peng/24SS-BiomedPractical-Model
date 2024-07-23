@@ -5,7 +5,7 @@ val: val/images
 
 # class names
 names:
-  0: with_lesion
+  0: Lesion
 
 # nc: number of classes
 nc: 1
