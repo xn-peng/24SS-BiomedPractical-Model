@@ -2,12 +2,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
+# Origianl VNet definition here comes from https://github.com/Lee-Wayne/VNet-Pytorch
+
 class conv3d(nn.Module):
     def __init__(self, in_channels, out_channels):
-        """
-        + Instantiate modules: conv-relu-norm
-        + Assign them as member variables
-        """
         super(conv3d, self).__init__()
         self.conv = nn.Conv3d(in_channels, out_channels, kernel_size=5, padding=2)
         self.relu = nn.PReLU()
@@ -19,12 +17,6 @@ class conv3d(nn.Module):
 
 
 class conv3d_x3(nn.Module):
-    """Three serial convs with a residual connection.
-    Structure:
-        inputs --> ① --> ② --> ③ --> outputs
-                   ↓ --> add--> ↑
-    """
-
     def __init__(self, in_channels, out_channels):
         super(conv3d_x3, self).__init__()
         self.conv_1 = conv3d(in_channels, out_channels)
@@ -38,11 +30,6 @@ class conv3d_x3(nn.Module):
         return z_3 + self.skip_connection(x)
 
 class conv3d_x2(nn.Module):
-    """Three serial convs with a residual connection.
-    Structure:
-        inputs --> ① --> ② --> ③ --> outputs
-                   ↓ --> add--> ↑
-    """
 
     def __init__(self, in_channels, out_channels):
         super(conv3d_x2, self).__init__()
@@ -57,11 +44,6 @@ class conv3d_x2(nn.Module):
 
 
 class conv3d_x1(nn.Module):
-    """Three serial convs with a residual connection.
-    Structure:
-        inputs --> ① --> ② --> ③ --> outputs
-                   ↓ --> add--> ↑
-    """
 
     def __init__(self, in_channels, out_channels):
         super(conv3d_x1, self).__init__()
@@ -148,7 +130,6 @@ class softmax_out(nn.Module):
 
     def forward(self, x):
         """Output with shape [batch_size, 1, depth, height, width]."""
-        # Do NOT add normalize layer, or its values vanish.
         y_conv = self.conv_2(self.conv_1(x))
         return nn.Sigmoid()(y_conv)
 
@@ -191,35 +172,33 @@ class VNet(nn.Module):
         return self.out(deconv)
     
     
-# class CombinedModel(nn.Module):
-#     def __init__(self):
-#         super(CombinedModel, self).__init__()
-#         # self.vnet = VNet()
-#         self.vnet = SimpleVNet()
-#         self.diag_fc = nn.Linear(4, 64)  # 四个诊断特征，输出64个特征
+class CombinedModel(nn.Module):
+    def __init__(self):
+        super(CombinedModel, self).__init__()
+        self.vnet = VNet()
+        self.diag_fc = nn.Linear(4, 64) 
         
-#         # 假设 VNet 的输出是 128 * 32 * 32 * 32 （在 VNet 修改后计算得到的）
-#         vnet_output_features = 128 * 32 * 32 * 32
-#         combined_features = vnet_output_features + 64  # 加上诊断特征
+        vnet_output_features = 128 * 32 * 32 * 32
+        combined_features = vnet_output_features + 64
         
-#         self.fc_combine = nn.Linear(combined_features, 1024)
-#         self.final_conv = nn.Conv3d(1024, 1, kernel_size=1, stride=1)
-#         self.sigmoid = nn.Sigmoid()  # 输出层，用于得到分割图
+        self.fc_combine = nn.Linear(combined_features, 1024)
+        self.final_conv = nn.Conv3d(1024, 1, kernel_size=1, stride=1)
+        self.sigmoid = nn.Sigmoid() 
 
-#     def forward(self, mri, diag):
-#         mri_features = self.vnet(mri)
-#         mri_features_flat = mri_features.view(mri_features.size(0), -1)
-#         diag_features = F.relu(self.diag_fc(diag))
-#         combined = torch.cat((mri_features_flat, diag_features), dim=1)
-#         # combined = F.relu(self.fc_combine(combined))
-#         combined = combined.view(-1, 1024, 32, 32, 32)  # 根据 VNet 的具体输出调整尺寸
-#         output = self.final_conv(combined)
-#         output = self.sigmoid(output)  # 使用 sigmoid 使输出归一化到 [0,1]
-#         return output
+    def forward(self, mri, diag):
+        mri_features = self.vnet(mri)
+        mri_features_flat = mri_features.view(mri_features.size(0), -1)
+        diag_features = F.relu(self.diag_fc(diag))
+        combined = torch.cat((mri_features_flat, diag_features), dim=1)
+        combined = combined.view(-1, 1024, 32, 32, 32) 
+        output = self.final_conv(combined)
+        output = self.sigmoid(output)
+        return output
     
 class VNetWithDiagnosis(nn.Module):
     def __init__(self):
         super(VNetWithDiagnosis, self).__init__()
+        self.vnet = VNet()
         self.initial_downsample = nn.Conv3d(1, 1, kernel_size=3, stride=2, padding=1)
         self.encoder1 = self.make_layers(1, 16)
         self.pool1 = nn.MaxPool3d(2)
@@ -252,20 +231,12 @@ class VNetWithDiagnosis(nn.Module):
         x = self.pool2(x2)
 
         diagnosis = diagnosis.view(1, 4, 1, 1, 1).expand(-1, -1, x.size(2), x.size(3), x.size(4))
-        
-        
-#         if diagnosis.dim() == 1 and diagnosis.size(0) == 4:
-#             diagnosis = diagnosis.unsqueeze(0)  # 将形状从 (4,) 改为 (1, 4)
-
-#         # 使用expand确保diagnosis张量可以与x在空间维度上匹配
-#         diagnosis = diagnosis.view(1, 4, 1, 1, 1).expand(-1, -1, x.size(2), x.size(3), x.size(4))
 
         x = torch.cat((x, diagnosis), 1)
 
         x = self.decoder1(x)
         x = self.upsample1(x)
 
-        # Adjust x to match dimensions of x2 if they are close
         if abs(x.size(2) - x2.size(2)) <= 1:
             x = F.interpolate(x, size=x2.shape[2:], mode='trilinear', align_corners=False)
 
@@ -274,14 +245,12 @@ class VNetWithDiagnosis(nn.Module):
 
         x = F.interpolate(x, size=x1.shape[2:], mode='trilinear', align_corners=False)
 
-        # Again, adjust x to match dimensions of x1 if they are close
         if abs(x.size(2) - x1.size(2)) <= 1:
             x = F.interpolate(x, size=x1.shape[2:], mode='trilinear', align_corners=False)
 
         x = torch.cat((x, x1), 1)
         x = self.final_conv(x)
 
-        # Upsample to the original input size
         x = F.interpolate(x, size=original_size, mode='trilinear', align_corners=False)
         return x
 
