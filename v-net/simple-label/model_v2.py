@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+# Origianl VNet definition here comes from https://github.com/Lee-Wayne/VNet-Pytorch
+
 class conv3d(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(conv3d, self).__init__()
